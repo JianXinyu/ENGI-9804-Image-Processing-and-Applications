@@ -3,8 +3,8 @@ function [Mpq,MUpq,NUpq]=calculate_moments(f,p,q)
 m=size(f,1); n=size(f,2); % get the size of the image
 M00=0;M01=0;M10=0;
 
-for i=1:m,
-    for j=1:n,
+for i=1:m
+    for j=1:n
         M00=M00 +double( f(i,j));     
         M10=M10 +double( i*f(i,j));
         M01=M01 + double(j*f(i,j));

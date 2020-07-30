@@ -1,6 +1,5 @@
 %function Moment_invariants
-function Moment_invariants(I)
-
+function Moment_Invariants=Moment_invariants(I)
 f=im2double(I);
  % pass the image to a function to calculate the moments
 [M20,MU20,NU20]=calculate_moments(f,2,0);
