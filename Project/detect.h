@@ -8,70 +8,84 @@ using namespace std;
 //针对灰度图的中值滤波+CVPR 2019的SideWindowFilter
 //其他种类的滤波直接换核即可
 
-//记录每一个方向的核的不为0的元素个数
+//        ┏━━━┯━━━┓--->y
+//        ┃ A │ B ┃
+//        ┠───┼───┨
+//        ┃ D │ C ┃
+//        ┗━━━┷━━━┛
+//        |
+//        v x
+// Eight side windows: up(U)(AB), down(D)(DC), right(R)(BC), left(L)(AD)
+//       northwest (NW)(A), northeast (NE)(B), southwest (SW)(D), southeast (SE)(C),
+// {A, B, D, C, AB, DC, BC, AD}
+// Record the number of non-zero elements of the kernel in each side window
 int cnt[8] = { 0, 0, 0, 0, 0, 0, 0, 0 };
-// 记录每一个方向的滤波器
+// Record the filter in each side window
 vector <int> filter[8];
 
-//初始化半径为radius的滤波器，原理可以看https://mp.weixin.qq.com/s/vjzZjRoQw7MnkqAfvwBUNA
+// Initialize the filter with a radius of radius
 void InitFilter(int radius) {
-    int n = radius * 2 + 1;
+    int n = radius * 2 + 1; // the number of pixels on the diameter
+    // initialize cnt and filter
     for (int i = 0; i < 8; i++) {
         cnt[i] = 0;
         filter[i].clear();
     }
+    // set initial value of filter
     for (int i = 0; i < 8; i++) {
         for (int x = 0; x < n; x++) {
             for (int y = 0; y < n; y++) {
                 if (i == 0 && x <= radius && y <= radius) {
-                    filter[i].push_back(1);
+                    filter[i].push_back(1); // A
                 }
                 else if (i == 1 && x <= radius && y >= radius) {
-                    filter[i].push_back(1);
+                    filter[i].push_back(1); // B
                 }
                 else if (i == 2 && x >= radius && y <= radius) {
-                    filter[i].push_back(1);
+                    filter[i].push_back(1); // D
                 }
                 else if (i == 3 && x >= radius && y >= radius) {
-                    filter[i].push_back(1);
+                    filter[i].push_back(1); // C
                 }
                 else if (i == 4 && x <= radius) {
-                    filter[i].push_back(1);
+                    filter[i].push_back(1); // AB
                 }
                 else if (i == 5 && x >= radius) {
-                    filter[i].push_back(1);
+                    filter[i].push_back(1); // DC
                 }
                 else if (i == 6 && y >= radius) {
-                    filter[i].push_back(1);
+                    filter[i].push_back(1); // BC
                 }
                 else if (i == 7 && y <= radius) {
-                    filter[i].push_back(1);
+                    filter[i].push_back(1); // AD
                 }
-                else {
+                else { // protect
                     filter[i].push_back(0);
                 }
             }
         }
     }
+    // set initial value of cnt
     for (int i = 0; i < 8; i++) {
         int sum = 0;
-        for (int j = 0; j < filter[i].size(); j++) sum += filter[i][j] == 1;
+        for (int j : filter[i]) sum += j == 1;
         cnt[i] = sum;
     }
 }
 
-//实现Side Window Filter的中值滤波，强制保边
+// Realize the median filter of Side Window Filter, force edge preservation
 Mat MedianSideWindowFilter(Mat src, int radius = 1) {
     int row = src.rows;
     int col = src.cols;
     int channels = src.channels();
     InitFilter(radius);
-    //针对灰度图
-    vector <int> now;
+    // for grayscale image
+    vector <int> now; // store the filter image
     if (channels == 1) {
         Mat dst(row, col, CV_8UC1);
         for (int i = 0; i < row; i++) {
             for (int j = 0; j < col; j++) {
+                // at the horizons of the image
                 if (i < radius || i + radius >= row || j < radius || j + radius >= col) {
                     dst.at<uchar>(i, j) = src.at<uchar>(i, j);
                     continue;
@@ -85,7 +99,8 @@ Mat MedianSideWindowFilter(Mat src, int radius = 1) {
                     for (int x = -radius; x <= radius; x++) {
                         for (int y = -radius; y <= radius; y++) {
                             //if (x == 0 && y == 0) continue;
-                            if (filter[k][id]) now.push_back(src.at<uchar>(i + x, j + y) * filter[k][id]);
+                            if (filter[k][id])
+                                now.push_back(src.at<uchar>(i + x, j + y) * filter[k][id]);
                             id++;
                             //val += src.at<uchar>(i + x, j + y) * filter[k][id++];
                         }
@@ -117,7 +132,7 @@ Mat MedianSideWindowFilter(Mat src, int radius = 1) {
         }
         return dst;
     }
-    //针对RGB图
+    //for colorful(RGB) image
     Mat dst(row, col, CV_8UC3);
     for (int c = 0; c < 3; c++) {
         for (int i = 0; i < row; i++) {
@@ -169,12 +184,10 @@ Mat MedianSideWindowFilter(Mat src, int radius = 1) {
     return dst;
 }
 
-
-
 const double eps = 1e-7;
 
-//获取pt0->pt1向量和pt0->pt2向量之间的夹角
-static double angle(Point pt1, Point pt2, Point pt0)
+//calculate the angle between vector pt0->pt1 and vecotr pt0->pt2
+static double angle(const Point& pt1, const Point& pt2, const Point& pt0)
 {
     double dx1 = pt1.x - pt0.x;
     double dy1 = pt1.y - pt0.y;
@@ -183,86 +196,68 @@ static double angle(Point pt1, Point pt2, Point pt0)
     return (dx1*dx2 + dy1*dy2) / sqrt((dx1*dx1 + dy1*dy1)*(dx2*dx2 + dy2*dy2) + eps);
 }
 
-//寻找矩形
-static void findSquares(const Mat& image, vector<vector<Point> >& squares, int N = 5, int thresh = 50)
+/**
+ * Search for squares
+ * @param image
+ * @param(out) squares: store the squares found
+ * @param N
+ * @param thresh: second threshold for Canny algorithm.
+ */
+static void findSquares(const Mat& image, vector<vector<Point> >& squares, int N = 5, int thresh = 15)
 {
+    // Filtering can improve the performance of edge detection
+    Mat timg(image); // store the filtered image
+    // Ordinary median filter
+    medianBlur(image, timg, 9);
+    // Median Side Window Filter
+    //timg = MedianSideWindowFilter(image, 4);
 
-    //滤波可以提升边缘检测的性能
-    Mat timg(image);
-    // 普通中值滤波
-    //medianBlur(image, timg, 9);
-    // SideWindowFilter的中值滤波
-    timg = MedianSideWindowFilter(image, 4);
     Mat gray0(timg.size(), CV_8U), gray;
-    // 存储轮廓
-    vector<vector<Point> > contours;
+    vector<vector<Point> > contours; // Store contour
 
-    // 在图像的每一个颜色通道寻找矩形
+    // Find a rectangle in each color channel of the image
     for (int c = 0; c < 3; c++)
     {
         int ch[] = { c, 0 };
-        // 函数功能：mixChannels主要就是把输入的矩阵（或矩阵数组）的某些通道拆分复制给对应的输出矩阵（或矩阵数组）的某些通道中，其中的对应关系就由fromTo参数制定.
-        // 接口：void  mixChannels (const Mat*  src , int  nsrc , Mat*  dst , int  ndst , const int*  fromTo , size_t  npairs );
-        // src: 输入矩阵，可以为一个也可以为多个，但是矩阵必须有相同的大小和深度.
-        // nsrc: 输入矩阵的个数.
-        // dst: 输出矩阵，可以为一个也可以为多个，但是所有的矩阵必须事先分配空间（如用create），大小和深度须与输入矩阵等同.
-        // ndst: 输出矩阵的个数
-        // fromTo:设置输入矩阵的通道对应输出矩阵的通道，规则如下：首先用数字标记输入矩阵的各个通道。输入矩阵个数可能多于一个并且每个矩阵的通道可能不一样，
-        // 第一个输入矩阵的通道标记范围为：0 ~src[0].channels() - 1，第二个输入矩阵的通道标记范围为：src[0].channels() ~src[0].channels() + src[1].channels() - 1,
-        // 以此类推；其次输出矩阵也用同样的规则标记，第一个输出矩阵的通道标记范围为：0 ~dst[0].channels() - 1，第二个输入矩阵的通道标记范围为：dst[0].channels()
-        // ~dst[0].channels() + dst[1].channels() - 1, 以此类推；最后，数组fromTo的第一个元素即fromTo[0]应该填入输入矩阵的某个通道标记，而fromTo的第二个元素即
-        // fromTo[1]应该填入输出矩阵的某个通道标记，这样函数就会把输入矩阵的fromTo[0]通道里面的数据复制给输出矩阵的fromTo[1]通道。fromTo后面的元素也是这个
-        // 道理，总之就是一个输入矩阵的通道标记后面必须跟着个输出矩阵的通道标记.
-        // npairs: 即参数fromTo中的有几组输入输出通道关系，其实就是参数fromTo的数组元素个数除以2.
+        // Copies specified channels from input arrays to the specified channels of output arrays.
         mixChannels(&timg, 1, &gray0, 1, ch, 1);
 
-        // 尝试几个不同的阈值
+        // Try a few different thresholds
         for (int l = 0; l < N; l++)
         {
             // hack: use Canny instead of zero threshold level.
             // Canny helps to catch squares with gradient shading
-            // 在级别为0的时候不使用阈值为0，而是使用Canny边缘检测算子
+            // When the level is 0, the threshold value of 0 is not used,
+            // but the Canny edge detection algorithm is used
             if (l == 0)
             {
-                // void Canny(	InputArray image, OutputArray edges, double threshold1, double threshold2, int apertureSize = 3, bool L2gradient = false);
-                // 第一个参数：输入图像（八位的图像）
-                // 第二个参数：输出的边缘图像
-                // 第三个参数：下限阈值，如果像素梯度低于下限阈值，则将像素不被认为边缘
-                // 第四个参数：上限阈值，如果像素梯度高于上限阈值，则将像素被认为是边缘（建议上限是下限的2倍或者3倍）
-                // 第五个参数：为Sobel()运算提供内核大小，默认值为3
-                // 第六个参数：计算图像梯度幅值的标志，默认值为false
+                // Finds edges in an image using the Canny algorithm
                 Canny(gray0, gray, 5, thresh, 5);
-                // 执行形态学膨胀操作
+                // Perform morphological dilation
                 dilate(gray, gray, Mat(), Point(-1, -1));
             }
             else
             {
-                // 当l不等于0的时候，执行 tgray(x,y) = gray(x,y) < (l+1)*255/N ? 255 : 0
+                // When l is not equal to 0, execute tgray(x,y) = gray(x,y) < (l+1)*255/N ? 255 : 0
                 gray = gray0 >= (l + 1) * 255 / N;
             }
 
-            // 寻找轮廓并将它们全部存储为列表
+            // Find contours and store them all as a list
             findContours(gray, contours, RETR_LIST, CHAIN_APPROX_SIMPLE);
 
-            //存储一个多边形（矩形）
+            //Store a polygon (rectangle)
             vector<Point> approx;
 
-            // 测试每一个轮廓
-            for (size_t i = 0; i < contours.size(); i++)
+            // Test every contour
+            for (auto & contour : contours)
             {
-                // 近似轮廓，精度与轮廓周长成正比,主要功能是把一个连续光滑曲线折线化，对图像轮廓点进行多边形拟合。
-                // 函数声明：void approxPolyDP(InputArray curve, OutputArray approxCurve, double epsilon, bool closed)
-                // InputArray curve:一般是由图像的轮廓点组成的点集
-                // OutputArray approxCurve：表示输出的多边形点集
-                // double epsilon：主要表示输出的精度，就是两个轮廓点之间最大距离数，5,6,7，，8，，,,，
-                // bool closed：表示输出的多边形是否封闭
+                // Approximates a polygonal curve(s) with the specified precision.
+                approxPolyDP(Mat(contour), approx, 20, true);
 
-                // arcLength 计算图像轮廓的周长
-                approxPolyDP(Mat(contours[i]), approx, 20, true);
-
-                // 近似后，方形轮廓应具有4个顶点
-                // 相对较大的区域（以滤除嘈杂的轮廓）并且是凸集。
-                // 注意: 使用面积的绝对值，因为面积可以是正值或负值-根据轮廓方向
+                // After approximation, the square outline should have 4 vertices
+                // a relatively large area (to filter out noisy contours), and be a convex set.
+                // Note: Use the absolute value of the area, because the area can be positive
+                // or negative-depending on the contour direction
                 if (approx.size() == 4 &&
                     fabs(contourArea(Mat(approx))) > 1000 &&
                     isContourConvex(Mat(approx)))
@@ -271,12 +266,13 @@ static void findSquares(const Mat& image, vector<vector<Point> >& squares, int N
 
                     for (int j = 2; j < 5; j++)
                     {
-                        // 找到相邻边之间的角度的最大余弦
+                        // Find the greatest cosine of the angle between adjacent sides
                         double cosine = fabs(angle(approx[j % 4], approx[j - 2], approx[j - 1]));
                         maxCosine = MAX(maxCosine, cosine);
                     }
 
-                    // 如果所有角度的余弦都很小(所有角度均为90度)，将顶点集合写入结果vector
+                    // If the cosines of all angles are small (all angles are 90 degrees),
+                    // write the vertex set to the result vector
                     if (maxCosine < 0.3)
                         squares.push_back(approx);
                 }
@@ -285,14 +281,14 @@ static void findSquares(const Mat& image, vector<vector<Point> >& squares, int N
     }
 }
 
-//在图像上画出方形
+//Draw squares on the image
 void drawSquares(Mat &image, const vector<vector<Point> >& squares) {
-    for (size_t i = 0; i < squares.size(); i++)
+    for (const auto & square : squares)
     {
-        const Point* p = &squares[i][0];
+        const Point* p = &square[0];
 
-        int n = (int)squares[i].size();
-        //不检测边界
+        int n = (int)square.size();
+        // not detect boundaries
         if (p->x > 3 && p->y > 3)
             polylines(image, &p, &n, 1, true, Scalar(0, 255, 0), 3, LINE_AA);
     }
