@@ -37,34 +37,45 @@ std::ostream& operator << ( std::ostream& outs, const std::vector<T> &vec)
 
 int main()
 {
-    Mat src = imread("p4.png");
+    Mat src = imread("./original_image/mess.png");
     imshow("src img", src);
     Mat source = src.clone();
-
     Mat bkup = src.clone();
-
     Mat img = src.clone();
-    cvtColor(img, img, COLOR_RGB2GRAY);   // Binarization
+    /***************************Pre-process*****************************/
+    //! Transform into grayscale image
+    cvtColor(img, img, COLOR_RGB2GRAY);
     imshow("gray", img);
-    //equalizeHist(img, img);
-    //imshow("equal", img);
+    imwrite("./output_images/gray_image.jpg", img);
+
+//    equalizeHist(img, img);
+//    imshow("equal", img);
+
+    //! filter
 //    GaussianBlur(img, img, Size(5, 5), 0, 0);  // Gaussian filtering
 //    img = MedianSideWindowFilter(img, 4);
     sideWindowBoxFilter(img, img, 4, 6);
+    imwrite("./output_images/filtered_image.jpg", img);
+    //! dilation
     // Get a custom core
     // The first parameter MORPH_RECT represents the rectangular convolution kernel,
     // of course, you can also choose elliptical, cross-shaped
     Mat element = getStructuringElement(MORPH_RECT, Size(3, 3));
     dilate(img, img, element); // Dilation
     imshow("dilate", img);
-    Canny(img, img, 30, 120, 3);   // Edge extraction
-    imshow("get contour", img);
+    imwrite("./output_images/dilated_image.jpg", img);
 
+    //! edge detection
+    Canny(img, img, 30, 120, 3);
+    imshow("get contour", img);
+    imwrite("./output_images/contour.jpg", img);
+
+    /********************************** contours processing *****************************/
     vector<vector<Point> > contours;
     vector<vector<Point> > f_contours;
     std::vector<cv::Point> approx2;
     //Note that the fifth parameter is CV_RETR_EXTERNAL, only the outer frame is retrieved
-    findContours(img, f_contours, RETR_EXTERNAL, CHAIN_APPROX_NONE); // Find contour
+    findContours(img, f_contours, RETR_EXTERNAL, CHAIN_APPROX_NONE); // Find contours
 
     // Find the contour with the largest area
     int max_area = 0;
@@ -82,19 +93,20 @@ int main()
     contours.push_back(f_contours[index]);
 
     // Because here is to find the outermost contour, there is only one contour theoretically
-    cout << contours.size() << endl;
+    cout << "Number of Contours: " << contours.size() << endl;
 
     vector<Point> tmp = contours[0];
 
+    /*********************************Vertices Search***************************************/
     for (int line_type = 1; line_type <= 3; line_type++)
     {
         cout << "line_type: " << line_type << endl;
         Mat black = img.clone();
         black.setTo(0);
-        // Pay attention to the thickness of the line, don’t choose too thin
+        // Pay attention to the thickness of the line, don’t choose it too thin
         drawContours(black, contours, 0, Scalar(255), line_type);
         imshow("show contour", black);
-
+        imwrite("./output_images/processed_contour.jpg", black);
 
         std::vector<Vec4i> lines;
         std::vector<cv::Point2f> corners;
@@ -137,12 +149,13 @@ int main()
                 }
                 Num--;
             }
+            // Filter the situation that the number of detected lines is not 4
             if (lines.size() != 4)
             {
                 continue;
             }
 
-            //Calculate the intersection of straight lines and save the part in the image range
+            // Calculate the intersection points of straight lines
             for (int i = 0; i < lines.size(); i++)
             {
                 for (int j = i + 1; j < lines.size(); j++)
@@ -157,7 +170,7 @@ int main()
             {
                 continue;
             }
-#if 1
+
             bool IsGoodPoints = true;
 
             // Ensure that the distance between the point and the point is large enough to eliminate the wrong point
@@ -174,7 +187,7 @@ int main()
             }
 
             if (!IsGoodPoints) continue;
-#endif
+
             cv::approxPolyDP(cv::Mat(corners), approx, cv::arcLength(cv::Mat(corners), true) * 0.02, true);
 
             if (lines.size() == 4 && corners.size() == 4 && approx.size() == 4)
@@ -198,19 +211,20 @@ int main()
             cv::circle(bkup, corners[3], 3, CV_RGB(255, 255, 255), -1);
             cv::circle(bkup, center, 3, CV_RGB(255, 0, 255), -1);
             imshow("backup", bkup);
-            cout << "corners size" << corners.size() << endl;
+            cout << "corners size " << corners.size() << endl;
             // cv::waitKey();
 
             // bool sort_flag = sort_corners(corners);
             // if (!sort_flag) cout << "fail to sort" << endl;
 
             sortCorners(corners, center);
-            cout << "corners size" << corners.size() << endl;
+            cout << "corners size " << corners.size() << endl;
             cout << "tl:" << corners[0] << endl;
             cout << "tr:" << corners[1] << endl;
             cout << "br:" << corners[2] << endl;
             cout << "bl:" << corners[3] << endl;
 
+            /****************************** Perspective Transformation**********************/
             CalcDstSize(corners);
 
             cv::Mat quad = cv::Mat::zeros(g_dst_hight, g_dst_width, CV_8UC3);
@@ -221,12 +235,14 @@ int main()
 
             quad_pts.emplace_back(0, quad.rows);
 
+            // perspective transform
             cv::Mat transmtx = cv::getPerspectiveTransform(corners, quad_pts);
             cv::warpPerspective(source, quad, transmtx, quad.size());
 
             imshow("find", bkup);
-            cv::imshow("quadrilateral", quad);
-
+            imwrite("./output_images/vertices.jpg", bkup);
+            imshow("quadrilateral", quad);
+            imwrite("./output_images/output.jpg", quad);
             /*uncomment this if Binarization is needed*/
             /*
             Mat local,gray;

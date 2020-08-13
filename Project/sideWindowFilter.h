@@ -3,6 +3,13 @@
 
 #include <opencv2\opencv.hpp>
 
+/**
+ * side window box filter
+ * @param src original image
+ * @param dst output image after filter
+ * @param radius the radius of the side window
+ * @param iteration
+ */
 void sideWindowBoxFilter(const cv::Mat& src, cv::Mat& dst, int radius, int iteration);
 
 // Initialize the filter with a radius of radius

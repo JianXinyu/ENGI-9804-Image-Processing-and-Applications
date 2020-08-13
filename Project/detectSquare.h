@@ -16,7 +16,7 @@ bool IsBadLine(int a, int b);
 void CalcDstSize(const std::vector<cv::Point2f>& corners);
 
 /**
- * Search for squares
+ * Search for rectangles
  * @param image
  * @param(out) squares: store the squares found
  * @param N
