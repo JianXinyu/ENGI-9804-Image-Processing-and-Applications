@@ -37,8 +37,10 @@ std::ostream& operator << ( std::ostream& outs, const std::vector<T> &vec)
 
 int main()
 {
-    Mat src = imread("./original_image/mess.png");
+    //! Input image
+    Mat src = imread("./original_image/card.png");
     imshow("src img", src);
+    waitKey(0);
     Mat source = src.clone();
     Mat bkup = src.clone();
     Mat img = src.clone();
@@ -47,7 +49,7 @@ int main()
     cvtColor(img, img, COLOR_RGB2GRAY);
     imshow("gray", img);
     imwrite("./output_images/gray_image.jpg", img);
-
+    waitKey(0);
 //    equalizeHist(img, img);
 //    imshow("equal", img);
 
@@ -55,21 +57,23 @@ int main()
 //    GaussianBlur(img, img, Size(5, 5), 0, 0);  // Gaussian filtering
 //    img = MedianSideWindowFilter(img, 4);
     sideWindowBoxFilter(img, img, 4, 6);
+    imshow("filtered", img);
     imwrite("./output_images/filtered_image.jpg", img);
+    waitKey(0);
     //! dilation
     // Get a custom core
     // The first parameter MORPH_RECT represents the rectangular convolution kernel,
     // of course, you can also choose elliptical, cross-shaped
-    Mat element = getStructuringElement(MORPH_RECT, Size(3, 3));
+    Mat element = getStructuringElement(MORPH_RECT, Size(6, 6));
     dilate(img, img, element); // Dilation
     imshow("dilate", img);
     imwrite("./output_images/dilated_image.jpg", img);
-
+    waitKey(0);
     //! edge detection
     Canny(img, img, 30, 120, 3);
-    imshow("get contour", img);
-    imwrite("./output_images/contour.jpg", img);
-
+    imshow("edges", img);
+    imwrite("./output_images/edges.jpg", img);
+    waitKey(0);
     /********************************** contours processing *****************************/
     vector<vector<Point> > contours;
     vector<vector<Point> > f_contours;
@@ -77,9 +81,16 @@ int main()
     //Note that the fifth parameter is CV_RETR_EXTERNAL, only the outer frame is retrieved
     findContours(img, f_contours, RETR_EXTERNAL, CHAIN_APPROX_NONE); // Find contours
 
+    Mat tmp=src.clone();
+    tmp.setTo(0);
+    drawContours(tmp, f_contours, -1, Scalar(255), 1);
+    imshow("contours", tmp);
+    imwrite("./output_images/contours.jpg", tmp);
+    waitKey(0);
     // Find the contour with the largest area
     int max_area = 0;
     int index;
+
     for (int i = 0; i < f_contours.size(); i++)
     {
         double tmparea = fabs(contourArea(f_contours[i]));
@@ -95,8 +106,6 @@ int main()
     // Because here is to find the outermost contour, there is only one contour theoretically
     cout << "Number of Contours: " << contours.size() << endl;
 
-    vector<Point> tmp = contours[0];
-
     /*********************************Vertices Search***************************************/
     for (int line_type = 1; line_type <= 3; line_type++)
     {
@@ -105,9 +114,9 @@ int main()
         black.setTo(0);
         // Pay attention to the thickness of the line, don’t choose it too thin
         drawContours(black, contours, 0, Scalar(255), line_type);
-        imshow("show contour", black);
+        imshow("contour", black);
         imwrite("./output_images/processed_contour.jpg", black);
-
+        waitKey(0);
         std::vector<Vec4i> lines;
         std::vector<cv::Point2f> corners;
         std::vector<cv::Point2f> approx;
@@ -210,7 +219,7 @@ int main()
             cv::circle(bkup, corners[2], 3, CV_RGB(0, 0, 255), -1);
             cv::circle(bkup, corners[3], 3, CV_RGB(255, 255, 255), -1);
             cv::circle(bkup, center, 3, CV_RGB(255, 0, 255), -1);
-            imshow("backup", bkup);
+//            imshow("backup", bkup);
             cout << "corners size " << corners.size() << endl;
             // cv::waitKey();
 
@@ -239,8 +248,9 @@ int main()
             cv::Mat transmtx = cv::getPerspectiveTransform(corners, quad_pts);
             cv::warpPerspective(source, quad, transmtx, quad.size());
 
-            imshow("find", bkup);
+            imshow("vertices", bkup);
             imwrite("./output_images/vertices.jpg", bkup);
+            waitKey(0);
             imshow("quadrilateral", quad);
             imwrite("./output_images/output.jpg", quad);
             /*uncomment this if Binarization is needed*/
