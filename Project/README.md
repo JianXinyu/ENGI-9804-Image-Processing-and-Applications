@@ -23,7 +23,7 @@
 
 Given an input image with a skew rectangular document and noisy background, the program can generate an output image with a regular rectangular document automatically. The workflow is shown in the following figure.
 
-![image-20200822222428170](/workflow.png)
+![workflow](/workflow.png)
 
 ## Some thoughts
 
