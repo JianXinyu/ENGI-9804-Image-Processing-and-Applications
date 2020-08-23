@@ -27,6 +27,6 @@ Given an input image with a skew rectangular document and noisy background, the 
 
 ## Some thoughts
 
-Side window filter is a really useful and powerful filter, yet it's simple and flexible. It can be combined with different filters, such as box filter, median filter. It could preserve the edges and corners, which is an wonderful feature in the edge detection. 
+Side window filter is a really useful and powerful filter, yet it's simple and flexible. It can be combined with different filters, such as box filter, median filter. It could preserve the edges and corners, which is a wonderful feature in edge detection. 
 
-At first, I thought doing perspective transformation is easy. It then turns out I was awfully wrong. At last, I used some tricky engineering technique to implement the function. However, it's not robust. It doesn't work for some figures. AI might be the final solution.
+At first, I thought doing perspective transformation is easy. It then turns out I was awfully wrong. At last, I used some tricky engineering techniques to implement the function. However, it's not robust. It doesn't work for some figures. AI might be the final solution.
